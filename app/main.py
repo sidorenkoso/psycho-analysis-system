@@ -8,6 +8,7 @@ from app import auth
 from pydantic import BaseModel
 from typing import List
 import json
+from app.ml_engine import analyze_results
 
 # Ініціалізація бази даних (створення таблиць)
 models.Base.metadata.create_all(bind=engine)
@@ -122,20 +123,22 @@ def submit_test(test_id: int, data: TestSubmission, request: Request, db: Sessio
     # 1. Попередній підрахунок
     total_score = sum(data.answers)
 
-    # 2. Збереження результату в БД (ML підключимо у Спринті 4)
+    # 2. Викликаємо наш інтелектуальний модуль!
+    risk_level, insights = analyze_results(data.answers, data.response_times, data.open_text)
+
+    # 3. Збереження результату в БД
     new_result = models.TestResult(
         user_id=user.id,
         test_id=test_id,
-        answers_json=json.dumps(data.answers),  # Зберігаємо сирі дані
+        answers_json=json.dumps(data.answers),
         total_score=total_score,
-        ml_risk_level="Аналізується...",
-        nlp_insights="Аналізується..."
+        ml_risk_level=risk_level,  # РЕАЛЬНИЙ РИЗИК
+        nlp_insights=insights  # РЕАЛЬНІ ІНСАЙТИ
     )
     db.add(new_result)
     db.commit()
 
     return {"status": "success", "redirect_url": "/dashboard"}
-
 
 # 5. Вихід з системи
 @app.get("/logout")
