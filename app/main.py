@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 from app.database import engine, get_db
 from app import models
 from app import auth
+from pydantic import BaseModel
+from typing import List
+import json
 
 # Ініціалізація бази даних (створення таблиць)
 models.Base.metadata.create_all(bind=engine)
@@ -67,7 +70,6 @@ def login_user(request: Request, username: str = Form(...), password: str = Form
 # 4. Особистий кабінет (Захищена сторінка)
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
-    # Перевіряємо, чи є у користувача токен (чи він увійшов)
     token = request.cookies.get("access_token")
     if not token:
         return RedirectResponse(url="/login")
@@ -77,7 +79,62 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/login")
 
     user = db.query(models.User).filter(models.User.username == username).first()
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
+
+    # Витягуємо всі тести та історію користувача
+    available_tests = db.query(models.PsychologicalTest).all()
+    user_results = db.query(models.TestResult).filter(models.TestResult.user_id == user.id).order_by(
+        models.TestResult.timestamp.desc()).all()
+
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "user": user,
+        "tests": available_tests,
+        "results": user_results
+    })
+
+
+# --- СТОРІНКА ПРОХОДЖЕННЯ ТЕСТУ ---
+@app.get("/test/{test_id}", response_class=HTMLResponse)
+def run_test(test_id: int, request: Request, db: Session = Depends(get_db)):
+    token = request.cookies.get("access_token")
+    if not token or not auth.decode_access_token(token):
+        return RedirectResponse(url="/login")
+
+    test = db.query(models.PsychologicalTest).filter(models.PsychologicalTest.id == test_id).first()
+    questions = db.query(models.Question).filter(models.Question.test_id == test_id).all()
+
+    return templates.TemplateResponse("test_run.html", {"request": request, "test": test, "questions": questions})
+
+
+# --- ПРИЙОМ РЕЗУЛЬТАТІВ ТЕСТУ ---
+class TestSubmission(BaseModel):
+    answers: List[int]
+    response_times: List[float]
+    open_text: str
+
+
+@app.post("/api/test/{test_id}/submit")
+def submit_test(test_id: int, data: TestSubmission, request: Request, db: Session = Depends(get_db)):
+    token = request.cookies.get("access_token")
+    username = auth.decode_access_token(token)
+    user = db.query(models.User).filter(models.User.username == username).first()
+
+    # 1. Попередній підрахунок
+    total_score = sum(data.answers)
+
+    # 2. Збереження результату в БД (ML підключимо у Спринті 4)
+    new_result = models.TestResult(
+        user_id=user.id,
+        test_id=test_id,
+        answers_json=json.dumps(data.answers),  # Зберігаємо сирі дані
+        total_score=total_score,
+        ml_risk_level="Аналізується...",
+        nlp_insights="Аналізується..."
+    )
+    db.add(new_result)
+    db.commit()
+
+    return {"status": "success", "redirect_url": "/dashboard"}
 
 
 # 5. Вихід з системи

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ test.title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .question-card { display: none; animation: fadeIn 0.5s; }
+        .question-card.active { display: block; }
+        .likert-btn { margin: 5px; width: 45px; height: 45px; border-radius: 50%; font-weight: bold; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container mt-5" style="max-width: 700px;">
+        <div class="card shadow border-0">
+            <div class="card-header bg-white border-0 pt-4 pb-0">
+                <h4 class="text-center text-primary">{{ test.title }}</h4>
+                <div class="progress mt-3" style="height: 10px;">
+                    <div id="progressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
+                </div>
+            </div>
+            <div class="card-body p-4 text-center">
+
+                {% for q in questions %}
+                <div class="question-card {% if loop.index == 1 %}active{% endif %}" id="step-{{ loop.index0 }}">
+                    <h5 class="mb-4">{{ loop.index }}. {{ q.text }}</h5>
+                    <div class="d-flex justify-content-center flex-wrap">
+                        <button class="btn btn-outline-secondary likert-btn" onclick="nextStep({{ loop.index0 }}, 1)">1</button>
+                        <button class="btn btn-outline-secondary likert-btn" onclick="nextStep({{ loop.index0 }}, 2)">2</button>
+                        <button class="btn btn-outline-secondary likert-btn" onclick="nextStep({{ loop.index0 }}, 3)">3</button>
+                        <button class="btn btn-outline-secondary likert-btn" onclick="nextStep({{ loop.index0 }}, 4)">4</button>
+                        <button class="btn btn-outline-secondary likert-btn" onclick="nextStep({{ loop.index0 }}, 5)">5</button>
+                    </div>
+                    <div class="d-flex justify-content-between mt-2 px-4 text-muted small">
+                        <span>Ніколи</span>
+                        <span>Постійно</span>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="question-card" id="step-{{ questions|length }}">
+                    <h5 class="mb-3">Опишіть ваш поточний емоційний стан:</h5>
+                    <textarea id="openText" class="form-control mb-3" rows="4" placeholder="Напишіть кілька речень..."></textarea>
+                    <button class="btn btn-success w-100" onclick="submitTest()">Завершити та проаналізувати</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const totalSteps = {{ questions|length }};
+        let answers = [];
+        let responseTimes = [];
+        let questionStartTime = Date.now();
+
+        function nextStep(currentStep, value) {
+            // Збір параданих (час на питання)
+            let timeTaken = (Date.now() - questionStartTime) / 1000.0;
+            responseTimes.push(timeTaken);
+            answers.push(value);
+
+            // Ховаємо поточне, показуємо наступне
+            document.getElementById(`step-${currentStep}`).classList.remove('active');
+            document.getElementById(`step-${currentStep + 1}`).classList.add('active');
+
+            // Оновлюємо прогрес-бар
+            let progress = ((currentStep + 1) / totalSteps) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+
+            questionStartTime = Date.now(); // Скидаємо таймер для наступного
+        }
+
+        async function submitTest() {
+            const openText = document.getElementById('openText').value;
+            const payload = {
+                answers: answers,
+                response_times: responseTimes,
+                open_text: openText
+            };
+
+            const response = await fetch('/api/test/{{ test.id }}/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                window.location.href = result.redirect_url;
+            } else {
+                alert("Помилка відправки даних");
+            }
+        }
+    </script>
+</body>
+</html>

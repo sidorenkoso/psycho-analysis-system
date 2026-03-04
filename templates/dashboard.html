@@ -16,21 +16,38 @@
         </div>
     </nav>
     <div class="container">
-        <h2>Особистий кабінет</h2>
-        <hr>
         <div class="row mt-4">
-            <div class="col-md-4">
-                <div class="card shadow-sm">
+            <div class="col-md-5">
+                <h4 class="mb-3">Доступні діагностики</h4>
+                {% for test in tests %}
+                <div class="card shadow-sm mb-3 border-primary">
                     <div class="card-body">
-                        <h5 class="card-title">Доступні тести</h5>
-                        <p class="card-text">Пройдіть діагностику для отримання детального ML-аналізу.</p>
-                        <button class="btn btn-primary" disabled>Пройти тест (В розробці)</button>
+                        <h5 class="card-title text-primary">{{ test.title }}</h5>
+                        <p class="card-text text-muted" style="font-size: 0.9em;">{{ test.description }}</p>
+                        <a href="/test/{{ test.id }}" class="btn btn-primary w-100">Почати тестування</a>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            <div class="col-md-8">
-                <h4>Ваша історія результатів</h4>
-                <div class="alert alert-info">Тут відображатимуться ваші результати після проходження тестів.</div>
+
+            <div class="col-md-7">
+                <h4 class="mb-3">Ваша історія результатів</h4>
+                {% if results %}
+                    <div class="list-group shadow-sm">
+                        {% for res in results %}
+                        <div class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Тест #{{ res.test_id }}</h6>
+                                <small class="text-muted">{{ res.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                            <p class="mb-1">Загальний бал: <strong>{{ res.total_score }}</strong></p>
+                            <small class="text-danger">Ризик: {{ res.ml_risk_level }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-secondary">Ви ще не пройшли жодного тесту.</div>
+                {% endif %}
             </div>
         </div>
     </div>
