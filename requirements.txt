@@ -3,3 +3,8 @@ uvicorn
 pydantic
 scikit-learn
 numpy
+bcrypt
+pyjwt
+python-multipart
+sqlalchemy
+jinja2
